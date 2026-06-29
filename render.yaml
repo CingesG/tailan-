@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: bar-tailan
+    runtime: node
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_DIR
+        value: /data
+    disk:
+      name: bar-db
+      mountPath: /data
+      sizeGB: 1
