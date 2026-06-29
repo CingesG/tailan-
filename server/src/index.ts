@@ -10,7 +10,9 @@ import reportRoutes from './routes/reports'
 const app = express()
 const PORT = process.env.PORT || 3001
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:4173'] }))
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors({ origin: true }))
+}
 app.use(express.json({ limit: '10mb' }))
 
 // API routes
