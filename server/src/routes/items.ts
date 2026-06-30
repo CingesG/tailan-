@@ -12,17 +12,17 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 })
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, category, price, unit } = req.body
+    const { name, category, price, unit, gram_unit } = req.body
     if (!name?.trim() || !category) return res.status(400).json({ error: 'Нэр, ангилал оруулна уу' })
     const maxRow = await db('items').where('category', category).max('sort_order as m').first() as any
-    const [id] = await db('items').insert({ name: name.trim(), category, price: price||0, sort_order: (maxRow?.m||0)+1, unit: unit||'ш' })
-    res.json({ id, name: name.trim(), category, price: price||0, unit: unit||'ш' })
+    const [id] = await db('items').insert({ name: name.trim(), category, price: price||0, sort_order: (maxRow?.m||0)+1, unit: unit||'ш', gram_unit: gram_unit||100 })
+    res.json({ id, name: name.trim(), category, price: price||0, unit: unit||'ш', gram_unit: gram_unit||100 })
   } catch(e) { res.status(500).json({ error: String(e) }) }
 })
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { name, category, price, unit } = req.body
-    await db('items').where('id', Number(req.params.id)).update({ name, category, price: price||0, unit: unit||'ш' })
+    const { name, category, price, unit, gram_unit } = req.body
+    await db('items').where('id', Number(req.params.id)).update({ name, category, price: price||0, unit: unit||'ш', gram_unit: gram_unit||100 })
     res.json({ ok: true })
   } catch(e) { res.status(500).json({ error: String(e) }) }
 })

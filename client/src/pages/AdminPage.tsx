@@ -12,6 +12,7 @@ interface Item {
   sort_order: number
   active: number
   unit?: string
+  gram_unit?: number
 }
 
 interface Props {
@@ -27,6 +28,7 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
   const [aPrice, setAPrice] = useState('')
   const [aCat, setACat] = useState<string>(CATEGORIES[0])
   const [aUnit, setAUnit] = useState<'ш' | 'гр'>('ш')
+  const [aGramUnit, setAGramUnit] = useState('100')
   const [editId, setEditId] = useState<number | null>(null)
   const [pwCurrent, setPwCurrent] = useState('')
   const [pwNew, setPwNew] = useState('')
@@ -56,18 +58,19 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
 
   async function addItem() {
     if (!aName.trim()) return
+    const gramUnit = parseInt(aGramUnit) || 100
     if (editId !== null) {
-      await api.updateItem(editId, { name: aName, category: aCat, price: parseInt(aPrice) || 0, unit: aUnit })
+      await api.updateItem(editId, { name: aName, category: aCat, price: parseInt(aPrice) || 0, unit: aUnit, gram_unit: gramUnit })
       setEditId(null)
     } else {
-      await api.addItem({ name: aName, category: aCat, price: parseInt(aPrice) || 0, unit: aUnit })
+      await api.addItem({ name: aName, category: aCat, price: parseInt(aPrice) || 0, unit: aUnit, gram_unit: gramUnit })
     }
-    setAName(''); setAPrice(''); setACat(CATEGORIES[0]); setAUnit('ш')
+    setAName(''); setAPrice(''); setACat(CATEGORIES[0]); setAUnit('ш'); setAGramUnit('100')
     loadItems()
   }
 
   function startEdit(it: Item) {
-    setEditId(it.id); setAName(it.name); setAPrice(String(it.price)); setACat(it.category); setAUnit((it.unit as 'ш' | 'гр') || 'ш')
+    setEditId(it.id); setAName(it.name); setAPrice(String(it.price)); setACat(it.category); setAUnit((it.unit as 'ш' | 'гр') || 'ш'); setAGramUnit(String(it.gram_unit || 100))
     // scroll to form
     document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
@@ -144,6 +147,14 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
               className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${aUnit === 'гр' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-500 border-stone-300'}`}
               onClick={() => setAUnit('гр')}>гр (грамм)</button>
           </div>
+          {aUnit === 'гр' && (
+            <div className="flex gap-2 items-center bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <span className="text-sm font-semibold text-amber-800 whitespace-nowrap">Үнэ нь</span>
+              <input className="inp-num w-20 text-center" type="number" inputMode="numeric" min="1"
+                value={aGramUnit} onChange={e => setAGramUnit(e.target.value)} />
+              <span className="text-sm font-semibold text-amber-800 whitespace-nowrap">гр-д = {parseInt(aPrice) ? parseInt(aPrice).toLocaleString() : '?'}₮</span>
+            </div>
+          )}
           <div className="flex gap-2">
             <button className="btn btn-dark flex-1 !py-3" onClick={addItem}>
               {editId !== null ? '💾 Хадгалах' : '➕ Нэмэх'}

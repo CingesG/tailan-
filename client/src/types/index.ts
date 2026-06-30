@@ -10,6 +10,7 @@ export interface Item {
   price: number
   sort_order: number
   unit?: string
+  gram_unit?: number
 }
 
 export interface Payment {

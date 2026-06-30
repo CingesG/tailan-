@@ -45,6 +45,10 @@ export async function initDb() {
     await db.schema.alterTable('items', t => { t.string('unit').defaultTo('ш') })
     console.log('✅ items.unit column added')
   }
+  if (!itemCols.gram_unit) {
+    await db.schema.alterTable('items', t => { t.integer('gram_unit').defaultTo(100) })
+    console.log('✅ items.gram_unit column added')
+  }
 
   const ic = (await db('items').count('id as c').first() as any).c
   if (!ic) {
