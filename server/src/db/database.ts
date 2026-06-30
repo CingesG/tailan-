@@ -40,6 +40,12 @@ export async function initDb() {
   const bc = (await db('branches').count('id as c').first() as any).c
   if (!bc) { await db('branches').insert([{name:'Огторгуй'},{name:'Agate'}]); console.log('✅ Branches seeded') }
 
+  const itemCols = await db('items').columnInfo() as any
+  if (!itemCols.unit) {
+    await db.schema.alterTable('items', t => { t.string('unit').defaultTo('ш') })
+    console.log('✅ items.unit column added')
+  }
+
   const ic = (await db('items').count('id as c').first() as any).c
   if (!ic) {
     await db('items').insert([

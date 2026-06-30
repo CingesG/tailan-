@@ -11,6 +11,7 @@ interface Item {
   price: number
   sort_order: number
   active: number
+  unit?: string
 }
 
 interface Props {
@@ -25,6 +26,7 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
   const [aName, setAName] = useState('')
   const [aPrice, setAPrice] = useState('')
   const [aCat, setACat] = useState<string>(CATEGORIES[0])
+  const [aUnit, setAUnit] = useState<'ш' | 'гр'>('ш')
   const [editId, setEditId] = useState<number | null>(null)
   const [pwCurrent, setPwCurrent] = useState('')
   const [pwNew, setPwNew] = useState('')
@@ -55,17 +57,17 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
   async function addItem() {
     if (!aName.trim()) return
     if (editId !== null) {
-      await api.updateItem(editId, { name: aName, category: aCat, price: parseInt(aPrice) || 0 })
+      await api.updateItem(editId, { name: aName, category: aCat, price: parseInt(aPrice) || 0, unit: aUnit })
       setEditId(null)
     } else {
-      await api.addItem({ name: aName, category: aCat, price: parseInt(aPrice) || 0 })
+      await api.addItem({ name: aName, category: aCat, price: parseInt(aPrice) || 0, unit: aUnit })
     }
-    setAName(''); setAPrice(''); setACat(CATEGORIES[0])
+    setAName(''); setAPrice(''); setACat(CATEGORIES[0]); setAUnit('ш')
     loadItems()
   }
 
   function startEdit(it: Item) {
-    setEditId(it.id); setAName(it.name); setAPrice(String(it.price)); setACat(it.category)
+    setEditId(it.id); setAName(it.name); setAPrice(String(it.price)); setACat(it.category); setAUnit((it.unit as 'ш' | 'гр') || 'ш')
     // scroll to form
     document.getElementById('item-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
@@ -131,6 +133,17 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
               {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          <div className="flex gap-2 items-center">
+            <span className="text-sm font-semibold text-stone-500">Нэгж:</span>
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${aUnit === 'ш' ? 'bg-stone-800 text-white border-stone-800' : 'bg-white text-stone-500 border-stone-300'}`}
+              onClick={() => setAUnit('ш')}>ш (ширхэг)</button>
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${aUnit === 'гр' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-stone-500 border-stone-300'}`}
+              onClick={() => setAUnit('гр')}>гр (грамм)</button>
+          </div>
           <div className="flex gap-2">
             <button className="btn btn-dark flex-1 !py-3" onClick={addItem}>
               {editId !== null ? '💾 Хадгалах' : '➕ Нэмэх'}
@@ -191,10 +204,13 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
 
                     {/* NAME & PRICE */}
                     <div className="flex-1 min-w-0">
-                      <div className={`font-medium text-sm truncate ${!isActive ? 'line-through text-stone-400' : ''}`}>
+                      <div className={`font-medium text-sm truncate flex items-center gap-1.5 ${!isActive ? 'line-through text-stone-400' : ''}`}>
                         {it.name}
+                        {it.unit === 'гр' && (
+                          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full no-underline" style={{textDecoration:'none'}}>гр</span>
+                        )}
                       </div>
-                      <div className="text-xs text-stone-400">{it.price ? fmt(it.price) : '—'}</div>
+                      <div className="text-xs text-stone-400">{it.price ? fmt(it.price) : '—'}{it.unit === 'гр' ? '/гр' : ''}</div>
                     </div>
 
                     {/* STATUS BADGE */}

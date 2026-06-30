@@ -32,8 +32,8 @@ export const api = {
 
   // Items
   getItems: (all = false) => req<any[]>('GET', `/items${all ? '?all=1' : ''}`),
-  addItem: (data: { name: string; category: string; price: number }) => req<any>('POST', '/items', data),
-  updateItem: (id: number, data: { name: string; category: string; price: number }) =>
+  addItem: (data: { name: string; category: string; price: number; unit?: string }) => req<any>('POST', '/items', data),
+  updateItem: (id: number, data: { name: string; category: string; price: number; unit?: string }) =>
     req('PUT', `/items/${id}`, data),
   toggleItem: (id: number) => req<{ ok: boolean; active: number }>('PATCH', `/items/${id}/toggle`),
   deleteItem: (id: number) => req('DELETE', `/items/${id}`),

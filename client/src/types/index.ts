@@ -9,6 +9,7 @@ export interface Item {
   category: string
   price: number
   sort_order: number
+  unit?: string
 }
 
 export interface Payment {

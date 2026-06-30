@@ -281,15 +281,20 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
                     const md = it.price && zar !== undefined ? zar * it.price : undefined
                     return (
                       <tr key={it.id} style={{background: idx % 2 === 0 ? '#fff' : '#fafaf7'}}>
-                        <td style={{border:'1px solid #e5e5e0',padding:'6px',fontWeight:500,fontSize:13,whiteSpace:'nowrap'}}>{it.name}</td>
+                        <td style={{border:'1px solid #e5e5e0',padding:'6px',fontWeight:500,fontSize:13,whiteSpace:'nowrap'}}>
+                          {it.name}
+                          {it.unit === 'гр' && <span style={{fontSize:9,fontWeight:700,background:'#fef3c7',color:'#b45309',borderRadius:4,padding:'1px 4px',marginLeft:4}}>гр</span>}
+                        </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
                           <input className="inp-sm" {...numInp} value={r.opening} onChange={e => updateRow(it.id, 'opening', e.target.value)} />
+                          {it.unit === 'гр' && r.opening ? <div style={{fontSize:9,color:'#aaa'}}>гр</div> : null}
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
                           <input className="inp-sm tatalt-inp" {...numInp} value={r.tatalt} onChange={e => updateRow(it.id, 'tatalt', e.target.value)} />
+                          {it.unit === 'гр' && r.tatalt ? <div style={{fontSize:9,color:'#aaa'}}>гр</div> : null}
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',fontWeight:700,color:'#b52020',fontSize:13}}>
-                          {zar !== undefined && zar > 0 ? zar : ''}
+                          {zar !== undefined && zar > 0 ? <>{zar}{it.unit === 'гр' && <span style={{fontSize:9,fontWeight:400,color:'#aaa',marginLeft:2}}>гр</span>}</> : ''}
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',fontWeight:700,color:'#b07800',fontSize:13}}>
                           {md ? fmtN(md) : ''}
@@ -299,6 +304,7 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
                             value={r.etsiin}
                             style={{borderColor: r.etsiin ? '#1a6535' : undefined, color:'#1a6535', fontWeight: r.etsiin ? 700 : undefined}}
                             onChange={e => updateRow(it.id, 'etsiin', e.target.value)} />
+                          {it.unit === 'гр' && r.etsiin ? <div style={{fontSize:9,color:'#aaa'}}>гр</div> : null}
                         </td>
                       </tr>
                     )
