@@ -36,7 +36,7 @@ router.patch('/:id/toggle', async (req: AuthRequest, res: Response) => {
   } catch(e) { res.status(500).json({ error: String(e) }) }
 })
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
-  try { await db('items').where('id', Number(req.params.id)).update({ active: 0 }); res.json({ ok: true }) }
+  try { await db('items').where('id', Number(req.params.id)).delete(); res.json({ ok: true }) }
   catch(e) { res.status(500).json({ error: String(e) }) }
 })
 export default router

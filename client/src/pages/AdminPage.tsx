@@ -148,11 +148,8 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
               onClick={() => setAUnit('гр')}>гр (грамм)</button>
           </div>
           {aUnit === 'гр' && (
-            <div className="flex gap-2 items-center bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-              <span className="text-sm font-semibold text-amber-800 whitespace-nowrap">Үнэ нь</span>
-              <input className="inp-num w-20 text-center" type="number" inputMode="numeric" min="1"
-                value={aGramUnit} onChange={e => setAGramUnit(e.target.value)} />
-              <span className="text-sm font-semibold text-amber-800 whitespace-nowrap">гр-д = {parseInt(aPrice) ? parseInt(aPrice).toLocaleString() : '?'}₮</span>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-sm text-amber-800 font-semibold">
+              💡 Үнэ = 1 нэгж (100гр)-ийн үнэ. Тайланд 12 гэж оруулбал 12 нэгж = 1200гр.
             </div>
           )}
           <div className="flex gap-2">

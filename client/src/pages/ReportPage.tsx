@@ -129,14 +129,13 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
 
   const repRows = useMemo<ReportRow[]>(() => items.map(it => {
     const r = rows[it.id] || { opening: '', tatalt: '', etsiin: '' }
-    const opening = parseInt(r.opening) || 0
-    const tatalt = parseInt(r.tatalt) || 0
-    const etsiin = r.etsiin !== '' ? (parseInt(r.etsiin) || 0) : undefined
+    const isGr = it.unit === 'гр'
+    const parseVal = (v: string) => isGr ? (parseFloat(v) || 0) : (parseInt(v) || 0)
+    const opening = parseVal(r.opening)
+    const tatalt = parseVal(r.tatalt)
+    const etsiin = r.etsiin !== '' ? parseVal(r.etsiin) : undefined
     const zarlaga = etsiin !== undefined ? Math.max(0, opening + tatalt - etsiin) : 0
-    const gramUnit = it.gram_unit || 100
-    const mongon_dun = it.price && zarlaga
-      ? (it.unit === 'гр' ? Math.round((zarlaga / gramUnit) * it.price) : zarlaga * it.price)
-      : 0
+    const mongon_dun = it.price && zarlaga ? Math.round(zarlaga * it.price) : 0
     return {
       item_id: it.id, item_name: it.name, category: it.category, price: it.price,
       opening, tatalt,
@@ -207,7 +206,8 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
     setTimeout(() => window.print(), 200)
   }
 
-  const numInp = { type: 'number', inputMode: 'numeric' as const, min: '0', placeholder: '0' }
+  const numInp = { type: 'number', inputMode: 'decimal' as const, min: '0', placeholder: '0' }
+  const grInp = { type: 'number', inputMode: 'decimal' as const, min: '0', step: '0.5', placeholder: '0' }
 
   return (
     <div>
@@ -277,14 +277,13 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
                   </tr>,
                   ...its.map((it, idx) => {
                     const r = rows[it.id] || { opening: '', tatalt: '', etsiin: '' }
-                    const op = parseInt(r.opening) || 0
-                    const tt = parseInt(r.tatalt) || 0
-                    const ets = r.etsiin !== '' ? (parseInt(r.etsiin) || 0) : undefined
+                    const isGr = it.unit === 'гр'
+                    const pv = (v: string) => isGr ? (parseFloat(v) || 0) : (parseInt(v) || 0)
+                    const op = pv(r.opening)
+                    const tt = pv(r.tatalt)
+                    const ets = r.etsiin !== '' ? pv(r.etsiin) : undefined
                     const zar = ets !== undefined ? Math.max(0, op + tt - ets) : undefined
-                    const gu = it.gram_unit || 100
-                    const md = it.price && zar !== undefined
-                      ? (it.unit === 'гр' ? Math.round((zar / gu) * it.price) : zar * it.price)
-                      : undefined
+                    const md = it.price && zar ? Math.round(zar * it.price) : undefined
                     return (
                       <tr key={it.id} style={{background: idx % 2 === 0 ? '#fff' : '#fafaf7'}}>
                         <td style={{border:'1px solid #e5e5e0',padding:'6px',fontWeight:500,fontSize:13,whiteSpace:'nowrap'}}>
@@ -292,25 +291,22 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
                           {it.unit === 'гр' && <span style={{fontSize:9,fontWeight:700,background:'#fef3c7',color:'#b45309',borderRadius:4,padding:'1px 4px',marginLeft:4}}>гр</span>}
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
-                          <input className="inp-sm" {...numInp} value={r.opening} onChange={e => updateRow(it.id, 'opening', e.target.value)} />
-                          {it.unit === 'гр' && r.opening ? <div style={{fontSize:9,color:'#aaa'}}>гр</div> : null}
+                          <input className="inp-sm" {...(isGr ? grInp : numInp)} value={r.opening} onChange={e => updateRow(it.id, 'opening', e.target.value)} />
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
-                          <input className="inp-sm tatalt-inp" {...numInp} value={r.tatalt} onChange={e => updateRow(it.id, 'tatalt', e.target.value)} />
-                          {it.unit === 'гр' && r.tatalt ? <div style={{fontSize:9,color:'#aaa'}}>гр</div> : null}
+                          <input className="inp-sm tatalt-inp" {...(isGr ? grInp : numInp)} value={r.tatalt} onChange={e => updateRow(it.id, 'tatalt', e.target.value)} />
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',fontWeight:700,color:'#b52020',fontSize:13}}>
-                          {zar !== undefined && zar > 0 ? <>{zar}{it.unit === 'гр' && <span style={{fontSize:9,fontWeight:400,color:'#aaa',marginLeft:2}}>гр</span>}</> : ''}
+                          {zar !== undefined && zar > 0 ? zar : ''}
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',fontWeight:700,color:'#b07800',fontSize:13}}>
                           {md ? fmtN(md) : ''}
                         </td>
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
-                          <input className="inp-sm" {...numInp}
+                          <input className="inp-sm" {...(isGr ? grInp : numInp)}
                             value={r.etsiin}
                             style={{borderColor: r.etsiin ? '#1a6535' : undefined, color:'#1a6535', fontWeight: r.etsiin ? 700 : undefined}}
                             onChange={e => updateRow(it.id, 'etsiin', e.target.value)} />
-                          {it.unit === 'гр' && r.etsiin ? <div style={{fontSize:9,color:'#aaa'}}>гр</div> : null}
                         </td>
                       </tr>
                     )
