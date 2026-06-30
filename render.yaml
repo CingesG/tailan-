@@ -9,7 +9,3 @@ services:
         value: production
       - key: DB_DIR
         value: /data
-    disk:
-      name: bar-db
-      mountPath: /data
-      sizeGB: 1
