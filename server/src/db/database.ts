@@ -3,8 +3,13 @@ import bcrypt from 'bcryptjs'
 import path from 'path'
 import fs from 'fs'
 
-const DB_DIR = process.env.DB_DIR || path.join(__dirname, '../../data')
-if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
+let DB_DIR = process.env.DB_DIR || path.join(__dirname, '../../data')
+try {
+  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
+} catch {
+  DB_DIR = path.join(__dirname, '../../data')
+  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
+}
 const DB_PATH = path.join(DB_DIR, 'bar.db')
 
 export const db: Knex = knex({ client: 'sqlite3', connection: { filename: DB_PATH }, useNullAsDefault: true })
