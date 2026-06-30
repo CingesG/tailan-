@@ -51,7 +51,7 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
   const paperRef = useRef<HTMLDivElement>(null)
   const userModified = useRef(false)
 
-  useEffect(() => { api.getItems().then(setItems) }, [])
+  useEffect(() => { api.getItems().then(setItems) }, [branchId])
 
   // Auto-save draft when user edits (not when loaded from server/carry)
   useEffect(() => {
@@ -281,7 +281,10 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
                     const tt = parseInt(r.tatalt) || 0
                     const ets = r.etsiin !== '' ? (parseInt(r.etsiin) || 0) : undefined
                     const zar = ets !== undefined ? Math.max(0, op + tt - ets) : undefined
-                    const md = it.price && zar !== undefined ? zar * it.price : undefined
+                    const gu = it.gram_unit || 100
+                    const md = it.price && zar !== undefined
+                      ? (it.unit === 'гр' ? Math.round((zar / gu) * it.price) : zar * it.price)
+                      : undefined
                     return (
                       <tr key={it.id} style={{background: idx % 2 === 0 ? '#fff' : '#fafaf7'}}>
                         <td style={{border:'1px solid #e5e5e0',padding:'6px',fontWeight:500,fontSize:13,whiteSpace:'nowrap'}}>
