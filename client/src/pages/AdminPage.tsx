@@ -210,7 +210,7 @@ export default function AdminPage({ branches, onBranchesChange }: Props) {
                           <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full no-underline" style={{textDecoration:'none'}}>гр</span>
                         )}
                       </div>
-                      <div className="text-xs text-stone-400">{it.price ? fmt(it.price) : '—'}{it.unit === 'гр' ? '/гр' : ''}</div>
+                      <div className="text-xs text-stone-400">{it.price ? fmt(it.price) : '—'}{it.unit === 'гр' ? '/100гр' : ''}</div>
                     </div>
 
                     {/* STATUS BADGE */}

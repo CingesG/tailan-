@@ -133,7 +133,9 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
     const tatalt = parseInt(r.tatalt) || 0
     const etsiin = r.etsiin !== '' ? (parseInt(r.etsiin) || 0) : undefined
     const zarlaga = etsiin !== undefined ? Math.max(0, opening + tatalt - etsiin) : 0
-    const mongon_dun = it.price && zarlaga ? zarlaga * it.price : 0
+    const mongon_dun = it.price && zarlaga
+      ? (it.unit === 'гр' ? Math.round((zarlaga / 100) * it.price) : zarlaga * it.price)
+      : 0
     return {
       item_id: it.id, item_name: it.name, category: it.category, price: it.price,
       opening, tatalt,
