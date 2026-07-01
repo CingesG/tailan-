@@ -15,6 +15,7 @@ interface Props {
 interface FixedPay {
   pos: string
   belen: string
+  shiljuuleg: string
   zarlaga: string
   zarlagaNote: string
   tsagiin: string
@@ -23,16 +24,17 @@ interface FixedPay {
 }
 
 const EMPTY_PAY: FixedPay = {
-  pos: '', belen: '', zarlaga: '', zarlagaNote: '', tsagiin: '', nemelt: '', nemeltNote: '',
+  pos: '', belen: '', shiljuuleg: '', zarlaga: '', zarlagaNote: '', tsagiin: '', nemelt: '', nemeltNote: '',
 }
 
 function payToList(pay: FixedPay): Payment[] {
   const list: Payment[] = []
-  if (parseInt(pay.pos))     list.push({ type: 'pos',     amount: parseInt(pay.pos),     note: '' })
-  if (parseInt(pay.belen))   list.push({ type: 'belen',   amount: parseInt(pay.belen),   note: '' })
-  if (parseInt(pay.zarlaga)) list.push({ type: 'expense', amount: parseInt(pay.zarlaga), note: pay.zarlagaNote })
-  if (parseInt(pay.tsagiin)) list.push({ type: 'tsagiin', amount: parseInt(pay.tsagiin), note: '' })
-  if (parseInt(pay.nemelt))  list.push({ type: 'nemelt',  amount: parseInt(pay.nemelt),  note: pay.nemeltNote })
+  if (parseInt(pay.pos))          list.push({ type: 'pos',        amount: parseInt(pay.pos),          note: '' })
+  if (parseInt(pay.belen))        list.push({ type: 'belen',      amount: parseInt(pay.belen),        note: '' })
+  if (parseInt(pay.shiljuuleg))   list.push({ type: 'shiljuuleg', amount: parseInt(pay.shiljuuleg),   note: '' })
+  if (parseInt(pay.zarlaga))      list.push({ type: 'expense',    amount: parseInt(pay.zarlaga),      note: pay.zarlagaNote })
+  if (parseInt(pay.tsagiin))      list.push({ type: 'tsagiin',    amount: parseInt(pay.tsagiin),      note: '' })
+  if (parseInt(pay.nemelt))       list.push({ type: 'nemelt',     amount: parseInt(pay.nemelt),       note: pay.nemeltNote })
   return list
 }
 
@@ -81,7 +83,7 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
     userModified.current = false
     setTransferOut({})
 
-    // Load incoming transfers
+    // Incoming transfers always loaded from DB regardless of draft/report
     try {
       const incoming = await api.getIncomingTransfers(branchId, d)
       const inc: Record<number, number> = {}
@@ -89,6 +91,20 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
       setIncomingTransfers(inc)
     } catch { setIncomingTransfers({}) }
 
+    // Draft ALWAYS takes priority — workers' latest entries must never be lost
+    const draftStr = localStorage.getItem(draftKey(branchId, d))
+    if (draftStr) {
+      try {
+        const draft = JSON.parse(draftStr)
+        setRows(draft.rows || {})
+        setPay(draft.pay || EMPTY_PAY)
+        setTransferOut(draft.transferOut || {})
+        if (draft.transferToBranch) setTransferToBranch(draft.transferToBranch)
+        return
+      } catch {}
+    }
+
+    // No draft — try saved DB report
     try {
       const rep = await api.getReport(branchId, d)
       const restored: Record<number, { opening: string; tatalt: string; etsiin: string }> = {}
@@ -102,26 +118,30 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
       setRows(restored)
       const fp: FixedPay = { ...EMPTY_PAY }
       rep.payments.forEach((p: any) => {
-        if (p.type === 'pos')          fp.pos = String(p.amount)
-        else if (p.type === 'belen')   fp.belen = String(p.amount)
-        else if (p.type === 'expense') { fp.zarlaga = String(p.amount); fp.zarlagaNote = p.note || '' }
-        else if (p.type === 'tsagiin') fp.tsagiin = String(p.amount)
-        else if (p.type === 'nemelt')  { fp.nemelt = String(p.amount); fp.nemeltNote = p.note || '' }
+        if (p.type === 'pos')             fp.pos = String(p.amount)
+        else if (p.type === 'belen')      fp.belen = String(p.amount)
+        else if (p.type === 'shiljuuleg') fp.shiljuuleg = String(p.amount)
+        else if (p.type === 'expense')    { fp.zarlaga = String(p.amount); fp.zarlagaNote = p.note || '' }
+        else if (p.type === 'tsagiin')    fp.tsagiin = String(p.amount)
+        else if (p.type === 'nemelt')     { fp.nemelt = String(p.amount); fp.nemeltNote = p.note || '' }
       })
       setPay(fp)
+      // Restore outgoing transfers so zarlaga display is correct
+      try {
+        const outgoing = await api.getOutgoingTransfers(branchId, d)
+        const trOut: Record<number, string> = {}
+        let targetBranch = 0
+        outgoing.forEach((t: any) => {
+          if (Number(t.quantity) > 0) {
+            trOut[t.item_id] = String(t.quantity)
+            targetBranch = t.to_branch_id
+          }
+        })
+        setTransferOut(trOut)
+        if (targetBranch) setTransferToBranch(targetBranch)
+      } catch {}
     } catch {
-      // No saved report — try draft first, then carry
-      const draftStr = localStorage.getItem(draftKey(branchId, d))
-      if (draftStr) {
-        try {
-          const draft = JSON.parse(draftStr)
-          setRows(draft.rows || {})
-          setPay(draft.pay || EMPTY_PAY)
-          setTransferOut(draft.transferOut || {})
-          if (draft.transferToBranch) setTransferToBranch(draft.transferToBranch)
-          return
-        } catch {}
-      }
+      // No draft, no saved report — carry previous day's etsiin as opening
       setPay(EMPTY_PAY)
       try {
         const carry = await api.getCarry(branchId, d)
@@ -166,19 +186,21 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
     const parseVal = (v: string) => isGr ? (parseFloat(v) || 0) : (parseInt(v) || 0)
     const opening = parseVal(r.opening)
     const tatalt = parseVal(r.tatalt) + (incomingTransfers[it.id] || 0)
+    const trOut = parseVal(transferOut[it.id] || '0')
     const etsiin = r.etsiin !== '' ? parseVal(r.etsiin) : undefined
-    const zarlaga = etsiin !== undefined ? Math.max(0, opening + tatalt - etsiin) : 0
+    // zarlaga = available - transferred_out - remaining (transferred items are not counted as sold)
+    const zarlaga = etsiin !== undefined ? Math.max(0, opening + tatalt - trOut - etsiin) : 0
     const mongon_dun = it.price && zarlaga ? Math.round(zarlaga * it.price) : 0
     return {
       item_id: it.id, item_name: it.name, category: it.category, price: it.price,
       opening, tatalt,
-      etsiin: etsiin !== undefined ? etsiin : opening + tatalt - zarlaga,
+      etsiin: etsiin !== undefined ? etsiin : opening + tatalt - trOut - zarlaga,
       zarlaga, mongon_dun,
     }
-  }), [items, rows, incomingTransfers])
+  }), [items, rows, incomingTransfers, transferOut])
 
   const total_sale = useMemo(() => repRows.reduce((s, r) => s + r.mongon_dun, 0), [repRows])
-  const total_in = (parseInt(pay.pos) || 0) + (parseInt(pay.belen) || 0)
+  const total_in = (parseInt(pay.pos) || 0) + (parseInt(pay.belen) || 0) + (parseInt(pay.shiljuuleg) || 0) + (parseInt(pay.tsagiin) || 0) + (parseInt(pay.nemelt) || 0)
   const diff = total_in - total_sale
 
   const catTotals = useMemo(() =>
@@ -208,9 +230,8 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
           .map(it => ({ item_id: it.id, quantity: parseFloat(transferOut[it.id] || '0') || 0 }))
         await api.saveTransfers({ date, from_branch_id: branchId, to_branch_id: transferToBranch, items: transferItems })
       }
-      Object.keys(localStorage)
-        .filter(k => k.startsWith(`bar_draft_${branchId}_`))
-        .forEach(k => localStorage.removeItem(k))
+      // Clear drafts for ALL branches for this date so everyone sees a clean state
+      branches.forEach(b => localStorage.removeItem(draftKey(b.id, date)))
       setSaved(true)
       setShowReport(true)
       setDate(d => shiftDate(d, 1))
@@ -341,9 +362,9 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
                     const incTransfer = incomingTransfers[it.id] || 0
                     const tt = pv(r.tatalt) + incTransfer
                     const ets = r.etsiin !== '' ? pv(r.etsiin) : undefined
-                    const zar = ets !== undefined ? Math.max(0, op + tt - ets) : undefined
-                    const md = it.price && zar ? Math.round(zar * it.price) : undefined
                     const trOut = parseFloat(transferOut[it.id] || '0') || 0
+                    const zar = ets !== undefined ? Math.max(0, op + tt - trOut - ets) : undefined
+                    const md = it.price && zar ? Math.round(zar * it.price) : undefined
                     return (
                       <tr key={it.id} style={{background: idx % 2 === 0 ? '#fff' : '#fafaf7'}}>
                         <td style={{border:'1px solid #e5e5e0',padding:'6px',fontWeight:500,fontSize:13,whiteSpace:'nowrap'}}>
@@ -434,6 +455,12 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
               </td>
             </tr>
             <tr>
+              <td style={{padding:'6px 4px 6px 0',fontWeight:600,fontSize:13,whiteSpace:'nowrap',color:'#0e7490'}}>Шилжүүлэг</td>
+              <td style={{padding:'4px 0'}}>
+                <input className="inp" {...numInp} value={pay.shiljuuleg} onChange={e => updatePay('shiljuuleg', e.target.value)} style={{borderColor: pay.shiljuuleg ? '#0e7490' : undefined}} />
+              </td>
+            </tr>
+            <tr>
               <td style={{padding:'6px 4px 6px 0',fontWeight:600,fontSize:13,whiteSpace:'nowrap'}}>Зарлага</td>
               <td style={{padding:'4px 0'}}>
                 <div className="flex gap-2">
@@ -478,7 +505,7 @@ export default function ReportPage({ branchId, branchName, initialDate, branches
             <div className="text-lg font-bold text-amber-700">{fmt(total_sale)}</div>
           </div>
           <div className="flex-1 min-w-[120px] bg-stone-50 border border-stone-200 rounded-xl p-3 text-center">
-            <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-1">POS + Бэлэн орлого</div>
+            <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-1">Нийт орлого</div>
             <div className="text-lg font-bold text-blue-700">{fmt(total_in)}</div>
           </div>
           <div className={`flex-1 min-w-[120px] rounded-xl p-3 text-center border ${diff > 0 ? 'bg-emerald-50 border-emerald-200' : diff < 0 ? 'bg-red-50 border-red-200' : 'bg-stone-50 border-stone-200'}`}>

@@ -15,7 +15,7 @@ const ReportPaper = forwardRef<HTMLDivElement, Props>(
     const ptot: Record<string, number> = {};
     payments.forEach((p) => (ptot[p.type] = (ptot[p.type] || 0) + p.amount));
     const incomePays = payments.filter(
-      (p) => p.type === "pos" || p.type === "shiljuuleg" || p.type === "belen",
+      (p) => p.type === "pos" || p.type === "shiljuuleg" || p.type === "belen" || p.type === "tsagiin" || p.type === "nemelt",
     );
 
     return (

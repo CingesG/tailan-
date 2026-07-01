@@ -41,8 +41,8 @@ export const api = {
   // Transfers
   getIncomingTransfers: (branchId: number, date: string) =>
     req<any[]>('GET', `/transfers/incoming?branch_id=${branchId}&date=${date}`),
-  getOutgoingTransfers: (fromBranchId: number, date: string, toBranchId: number) =>
-    req<any[]>('GET', `/transfers/outgoing?from_branch_id=${fromBranchId}&date=${date}&to_branch_id=${toBranchId}`),
+  getOutgoingTransfers: (fromBranchId: number, date: string, toBranchId?: number) =>
+    req<any[]>('GET', `/transfers/outgoing?from_branch_id=${fromBranchId}&date=${date}${toBranchId ? `&to_branch_id=${toBranchId}` : ''}`),
   saveTransfers: (data: { date: string; from_branch_id: number; to_branch_id: number; items: { item_id: number; quantity: number }[] }) =>
     req<{ ok: boolean }>('POST', '/transfers', data),
 
