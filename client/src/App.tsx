@@ -153,6 +153,7 @@ export default function App() {
                 branchId={curBranch.id}
                 branchName={curBranch.name}
                 initialDate={editDate || undefined}
+                branches={branches}
               />
             )}
             {tab === 'history' && (

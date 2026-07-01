@@ -33,6 +33,9 @@ export async function initDb() {
   if (!await db.schema.hasTable('report_payments')) {
     await db.schema.createTable('report_payments', t => { t.increments('id'); t.integer('report_id').notNullable(); t.string('type').notNullable(); t.integer('amount').defaultTo(0); t.string('note').defaultTo('') })
   }
+  if (!await db.schema.hasTable('transfers')) {
+    await db.schema.createTable('transfers', t => { t.increments('id'); t.string('date').notNullable(); t.integer('from_branch_id').notNullable(); t.integer('to_branch_id').notNullable(); t.integer('item_id').notNullable(); t.float('quantity').defaultTo(0) })
+  }
 
   const existingUser = await db('users').where('username','admin').first()
   if (!existingUser) { await db('users').insert({ username:'admin', password: bcrypt.hashSync('Bar2024!',10) }); console.log('✅ admin / Bar2024!') }

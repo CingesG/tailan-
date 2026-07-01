@@ -38,6 +38,14 @@ export const api = {
   toggleItem: (id: number) => req<{ ok: boolean; active: number }>('PATCH', `/items/${id}/toggle`),
   deleteItem: (id: number) => req('DELETE', `/items/${id}`),
 
+  // Transfers
+  getIncomingTransfers: (branchId: number, date: string) =>
+    req<any[]>('GET', `/transfers/incoming?branch_id=${branchId}&date=${date}`),
+  getOutgoingTransfers: (fromBranchId: number, date: string, toBranchId: number) =>
+    req<any[]>('GET', `/transfers/outgoing?from_branch_id=${fromBranchId}&date=${date}&to_branch_id=${toBranchId}`),
+  saveTransfers: (data: { date: string; from_branch_id: number; to_branch_id: number; items: { item_id: number; quantity: number }[] }) =>
+    req<{ ok: boolean }>('POST', '/transfers', data),
+
   // Reports
   getReportMonths: () => req<string[]>('GET', '/reports/months/all'),
   deleteReportMonth: (yearMonth: string) => req<{ ok: boolean }>('DELETE', `/reports/month/${yearMonth}`),

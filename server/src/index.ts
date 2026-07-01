@@ -6,6 +6,7 @@ import authRoutes from './routes/auth'
 import branchRoutes from './routes/branches'
 import itemRoutes from './routes/items'
 import reportRoutes from './routes/reports'
+import transferRoutes from './routes/transfers'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/branches', branchRoutes)
 app.use('/api/items', itemRoutes)
 app.use('/api/reports', reportRoutes)
+app.use('/api/transfers', transferRoutes)
 
 // Serve built frontend in production
 const distPath = path.join(__dirname, '../../client/dist')

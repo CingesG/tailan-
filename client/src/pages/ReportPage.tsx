@@ -9,6 +9,7 @@ interface Props {
   branchId: number
   branchName: string
   initialDate?: string
+  branches: { id: number; name: string }[]
 }
 
 interface FixedPay {
@@ -39,7 +40,7 @@ function draftKey(branchId: number, date: string) {
   return `bar_draft_${branchId}_${date}`
 }
 
-export default function ReportPage({ branchId, branchName, initialDate }: Props) {
+export default function ReportPage({ branchId, branchName, initialDate, branches }: Props) {
   const [date, setDate] = useState(initialDate || barTodayStr())
   const [showTatalt, setShowTatalt] = useState(false)
   const [items, setItems] = useState<Item[]>([])
@@ -51,18 +52,43 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
   const paperRef = useRef<HTMLDivElement>(null)
   const userModified = useRef(false)
 
+  // Transfer state
+  const [transferOut, setTransferOut] = useState<Record<number, string>>({})
+  const [transferToBranch, setTransferToBranch] = useState<number>(0)
+  const [incomingTransfers, setIncomingTransfers] = useState<Record<number, number>>({})
+
+  const otherBranches = branches.filter(b => b.id !== branchId)
+  const hasTransfer = otherBranches.length > 0
+
   useEffect(() => { api.getItems().then(setItems) }, [branchId])
 
-  // Auto-save draft when user edits (not when loaded from server/carry)
+  // Default target branch when branches change
+  useEffect(() => {
+    if (otherBranches.length > 0 && !transferToBranch) {
+      setTransferToBranch(otherBranches[0].id)
+    }
+  }, [branches, branchId])
+
+  // Auto-save draft when user edits
   useEffect(() => {
     if (!userModified.current) return
-    localStorage.setItem(draftKey(branchId, date), JSON.stringify({ rows, pay }))
-  }, [rows, pay, branchId, date])
+    localStorage.setItem(draftKey(branchId, date), JSON.stringify({ rows, pay, transferOut, transferToBranch }))
+  }, [rows, pay, branchId, date, transferOut, transferToBranch])
 
   const loadForDate = useCallback(async (d: string) => {
     setShowReport(false)
     setSaved(false)
     userModified.current = false
+    setTransferOut({})
+
+    // Load incoming transfers
+    try {
+      const incoming = await api.getIncomingTransfers(branchId, d)
+      const inc: Record<number, number> = {}
+      incoming.forEach((t: any) => { inc[t.item_id] = (inc[t.item_id] || 0) + Number(t.quantity) })
+      setIncomingTransfers(inc)
+    } catch { setIncomingTransfers({}) }
+
     try {
       const rep = await api.getReport(branchId, d)
       const restored: Record<number, { opening: string; tatalt: string; etsiin: string }> = {}
@@ -91,6 +117,8 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
           const draft = JSON.parse(draftStr)
           setRows(draft.rows || {})
           setPay(draft.pay || EMPTY_PAY)
+          setTransferOut(draft.transferOut || {})
+          if (draft.transferToBranch) setTransferToBranch(draft.transferToBranch)
           return
         } catch {}
       }
@@ -127,12 +155,17 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
     setPay(prev => ({ ...prev, [k]: v }))
   }
 
+  function updateTransferOut(itemId: number, val: string) {
+    userModified.current = true
+    setTransferOut(prev => ({ ...prev, [itemId]: val }))
+  }
+
   const repRows = useMemo<ReportRow[]>(() => items.map(it => {
     const r = rows[it.id] || { opening: '', tatalt: '', etsiin: '' }
     const isGr = it.unit === 'гр'
     const parseVal = (v: string) => isGr ? (parseFloat(v) || 0) : (parseInt(v) || 0)
     const opening = parseVal(r.opening)
-    const tatalt = parseVal(r.tatalt)
+    const tatalt = parseVal(r.tatalt) + (incomingTransfers[it.id] || 0)
     const etsiin = r.etsiin !== '' ? parseVal(r.etsiin) : undefined
     const zarlaga = etsiin !== undefined ? Math.max(0, opening + tatalt - etsiin) : 0
     const mongon_dun = it.price && zarlaga ? Math.round(zarlaga * it.price) : 0
@@ -142,7 +175,7 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
       etsiin: etsiin !== undefined ? etsiin : opening + tatalt - zarlaga,
       zarlaga, mongon_dun,
     }
-  }), [items, rows])
+  }), [items, rows, incomingTransfers])
 
   const total_sale = useMemo(() => repRows.reduce((s, r) => s + r.mongon_dun, 0), [repRows])
   const total_in = (parseInt(pay.pos) || 0) + (parseInt(pay.belen) || 0)
@@ -169,7 +202,12 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
     setLoading(true)
     try {
       await api.saveReport(buildReport())
-      // Тайлан хадгалагдсан тул энэ салбарын бүх draft устгана
+      // Save inter-branch transfers
+      if (hasTransfer && transferToBranch) {
+        const transferItems = items
+          .map(it => ({ item_id: it.id, quantity: parseFloat(transferOut[it.id] || '0') || 0 }))
+        await api.saveTransfers({ date, from_branch_id: branchId, to_branch_id: transferToBranch, items: transferItems })
+      }
       Object.keys(localStorage)
         .filter(k => k.startsWith(`bar_draft_${branchId}_`))
         .forEach(k => localStorage.removeItem(k))
@@ -208,10 +246,12 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
 
   const numInp = { type: 'number', inputMode: 'decimal' as const, min: '0', placeholder: '0' }
   const grInp = { type: 'number', inputMode: 'decimal' as const, min: '0', step: '0.5', placeholder: '0' }
+  const colSpan = hasTransfer ? 7 : 6
+  const targetBranchName = branches.find(b => b.id === transferToBranch)?.name || 'Нөгөө'
 
   return (
     <div>
-      {/* TATALT MODAL — save товч дарахад татлат хоосон бол гарна */}
+      {/* TATALT MODAL */}
       {showTatalt && (
         <div style={{position:'fixed',inset:0,zIndex:999,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <div style={{background:'#fff',borderRadius:20,padding:24,maxWidth:320,width:'100%',boxShadow:'0 8px 40px rgba(0,0,0,0.25)',textAlign:'center'}}>
@@ -255,16 +295,34 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
           <span>Барааны хөдөлгөөн</span>
           <span className="text-blue-500 normal-case font-semibold tracking-normal">— Эцсийн үлдэгдэл оруулна</span>
         </div>
+
+        {/* Transfer target branch selector */}
+        {hasTransfer && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold text-violet-600 whitespace-nowrap">→ Дамжуулах:</span>
+            {otherBranches.length === 1
+              ? <span className="text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-2 py-1">{otherBranches[0].name}</span>
+              : <select className="inp !py-1 !text-sm flex-1" value={transferToBranch}
+                  onChange={e => { userModified.current = true; setTransferToBranch(Number(e.target.value)) }}>
+                  {otherBranches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+            }
+          </div>
+        )}
+
         <div className="overflow-x-auto -mx-4 px-4">
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:360}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth: hasTransfer ? 430 : 360}}>
             <thead>
               <tr>
                 <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',textAlign:'left',fontSize:10,fontWeight:700,color:'#888',whiteSpace:'nowrap',minWidth:100}}>Нэрс</th>
-                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#888',textAlign:'center',minWidth:60}}>Эхний<br/>үлдэгдэл</th>
-                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#888',textAlign:'center',minWidth:60}}>Татлат</th>
-                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#b52020',textAlign:'center',minWidth:60}}>Зарлага<br/><span style={{color:'#b52020',fontSize:9}}>(авто)</span></th>
-                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#b07800',textAlign:'center',minWidth:80}}>Мөнгөн дүн<br/><span style={{color:'#888',fontSize:9}}>(авто)</span></th>
-                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#1a6535',textAlign:'center',minWidth:60}}>Эцсийн<br/>үлдэгдэл</th>
+                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#888',textAlign:'center',minWidth:55}}>Эхний<br/>үлдэгдэл</th>
+                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#888',textAlign:'center',minWidth:55}}>Татлат</th>
+                {hasTransfer && (
+                  <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f0eeff',fontSize:10,fontWeight:700,color:'#7c3aed',textAlign:'center',minWidth:50}}>→ {targetBranchName}</th>
+                )}
+                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#b52020',textAlign:'center',minWidth:50}}>Зарлага<br/><span style={{color:'#b52020',fontSize:9}}>(авто)</span></th>
+                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#b07800',textAlign:'center',minWidth:70}}>Мөнгөн дүн<br/><span style={{color:'#888',fontSize:9}}>(авто)</span></th>
+                <th style={{padding:'8px 6px',border:'1px solid #e5e5e0',background:'#f8f8f4',fontSize:10,fontWeight:700,color:'#1a6535',textAlign:'center',minWidth:55}}>Эцсийн<br/>үлдэгдэл</th>
               </tr>
             </thead>
             <tbody>
@@ -273,40 +331,80 @@ export default function ReportPage({ branchId, branchName, initialDate }: Props)
                 if (!its.length) return null
                 return [
                   <tr key={cat}>
-                    <td colSpan={6} style={{background:'#1a1a1a',color:'#fff',fontWeight:700,fontSize:10,letterSpacing:1.5,padding:'5px 8px',textAlign:'center'}}>{cat}</td>
+                    <td colSpan={colSpan} style={{background:'#1a1a1a',color:'#fff',fontWeight:700,fontSize:10,letterSpacing:1.5,padding:'5px 8px',textAlign:'center'}}>{cat}</td>
                   </tr>,
                   ...its.map((it, idx) => {
                     const r = rows[it.id] || { opening: '', tatalt: '', etsiin: '' }
                     const isGr = it.unit === 'гр'
                     const pv = (v: string) => isGr ? (parseFloat(v) || 0) : (parseInt(v) || 0)
                     const op = pv(r.opening)
-                    const tt = pv(r.tatalt)
+                    const incTransfer = incomingTransfers[it.id] || 0
+                    const tt = pv(r.tatalt) + incTransfer
                     const ets = r.etsiin !== '' ? pv(r.etsiin) : undefined
                     const zar = ets !== undefined ? Math.max(0, op + tt - ets) : undefined
                     const md = it.price && zar ? Math.round(zar * it.price) : undefined
+                    const trOut = parseFloat(transferOut[it.id] || '0') || 0
                     return (
                       <tr key={it.id} style={{background: idx % 2 === 0 ? '#fff' : '#fafaf7'}}>
                         <td style={{border:'1px solid #e5e5e0',padding:'6px',fontWeight:500,fontSize:13,whiteSpace:'nowrap'}}>
                           {it.name}
                           {it.unit === 'гр' && <span style={{fontSize:9,fontWeight:700,background:'#fef3c7',color:'#b45309',borderRadius:4,padding:'1px 4px',marginLeft:4}}>гр</span>}
                         </td>
+
+                        {/* OPENING */}
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
                           <input className="inp-sm" {...(isGr ? grInp : numInp)} value={r.opening} onChange={e => updateRow(it.id, 'opening', e.target.value)} />
+                          {isGr && op > 0 && (
+                            <div style={{fontSize:9,color:'#b45309',fontWeight:700,lineHeight:1.2,marginTop:1}}>{Math.round(op * 100)}гр</div>
+                          )}
                         </td>
+
+                        {/* TATALT */}
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
                           <input className="inp-sm tatalt-inp" {...(isGr ? grInp : numInp)} value={r.tatalt} onChange={e => updateRow(it.id, 'tatalt', e.target.value)} />
+                          {isGr && pv(r.tatalt) > 0 && (
+                            <div style={{fontSize:9,color:'#b45309',fontWeight:700,lineHeight:1.2,marginTop:1}}>{Math.round(pv(r.tatalt) * 100)}гр</div>
+                          )}
+                          {incTransfer > 0 && (
+                            <div style={{fontSize:9,color:'#1a6535',fontWeight:700,lineHeight:1.2,marginTop:1}}>+{incTransfer} ирэлт</div>
+                          )}
                         </td>
+
+                        {/* TRANSFER OUT */}
+                        {hasTransfer && (
+                          <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',background:'#f5f3ff'}}>
+                            <input className="inp-sm" {...(isGr ? grInp : numInp)}
+                              value={transferOut[it.id] || ''}
+                              onChange={e => updateTransferOut(it.id, e.target.value)}
+                              style={{color:'#7c3aed'}} />
+                            {isGr && trOut > 0 && (
+                              <div style={{fontSize:9,color:'#7c3aed',fontWeight:700,lineHeight:1.2,marginTop:1}}>{Math.round(trOut * 100)}гр</div>
+                            )}
+                          </td>
+                        )}
+
+                        {/* ZARLAGA (auto) */}
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',fontWeight:700,color:'#b52020',fontSize:13}}>
                           {zar !== undefined && zar > 0 ? zar : ''}
+                          {isGr && zar !== undefined && zar > 0 && (
+                            <div style={{fontSize:9,color:'#b52020',fontWeight:700,lineHeight:1.2}}>{Math.round(zar * 100)}гр</div>
+                          )}
                         </td>
+
+                        {/* MONGON DUN */}
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center',fontWeight:700,color:'#b07800',fontSize:13}}>
                           {md ? fmtN(md) : ''}
                         </td>
+
+                        {/* ETSIIN */}
                         <td style={{border:'1px solid #e5e5e0',padding:'4px',textAlign:'center'}}>
                           <input className="inp-sm" {...(isGr ? grInp : numInp)}
                             value={r.etsiin}
                             style={{borderColor: r.etsiin ? '#1a6535' : undefined, color:'#1a6535', fontWeight: r.etsiin ? 700 : undefined}}
                             onChange={e => updateRow(it.id, 'etsiin', e.target.value)} />
+                          {isGr && pv(r.etsiin) > 0 && (
+                            <div style={{fontSize:9,color:'#1a6535',fontWeight:700,lineHeight:1.2,marginTop:1}}>{Math.round(pv(r.etsiin) * 100)}гр</div>
+                          )}
                         </td>
                       </tr>
                     )
